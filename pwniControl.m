@@ -22,7 +22,7 @@ function varargout = pwniControl(varargin)
 
 % Edit the above text to modify the response to help pwniControl
 
-% Last Modified by GUIDE v2.5 13-Nov-2015 17:23:05
+% Last Modified by GUIDE v2.5 21-Nov-2015 15:51:46
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -62,6 +62,9 @@ realtimeRate = 15;
 rtBufferSize = 256000; %Samples per channel in user RT buffer
 
 dataPath = '\data\';
+
+doSharedMem = true;
+sharedMemKey = 'nullerRTSHM';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 daqS = daq.createSession('ni');
 ch0 = addAnalogInputChannel(daqS, 'Dev1', 0, 'Voltage');
@@ -83,6 +86,10 @@ rtBuffer = zeros(rtBufferSize,4);
 setappdata(handles.pwniControl,'rtBuffer',rtBuffer)
 setappdata(handles.pwniControl,'acqState',false)
 setappdata(handles.pwniControl,'dataPath',dataPath)
+setappdata(handles.pwniControl,'doSharedMem',doSharedMem)
+setappdata(handles.pwniControl,'sharedMemKey',sharedMemKey)
+setappdata(handles.pwniControl,'shmObj',0)
+setappdata(handles.pwniControl,'oldtime',datenum(now));
 
 logo = imread('littleRD.png');
 imshow(logo,'Parent',handles.logoAxes);
@@ -145,6 +152,11 @@ stop(handles.vidTimer)
 daqS=getappdata(handles.pwniControl,'daqS');
 delete(daqS)
 
+shmObj = getappdata(handles.pwniControl,'shmObj');
+if getappdata(handles.pwniControl,'shmObj') ~= 0
+    delete(shmObj)
+end
+
 delete(handles.pwniControl);
 %delete(handles.valTimer)
 delete(handles.vidTimer)
@@ -193,6 +205,21 @@ rtBuffer = circshift(rtBuffer,-dSize,1);
 % set(handles.plotAxes2,'XTickLabel','')
 % drawnow
 
+if getappdata(handles.pwniControl,'doSharedMem')
+    shmObj = getappdata(handles.pwniControl,'shmObj');
+    % Not sure if this is necessary (to detach) but I'm worried about
+    % memory leak
+    if getappdata(handles.pwniControl,'shmObj') ~= 0
+        delete(shmObj)
+    end
+    shmkey = getappdata(handles.pwniControl,'sharedMemKey');
+    shmObj = shmobject(shmkey, newdata);
+    setappdata(handles.pwniControl,'shmObj',shmObj)
+end
+
+% disp(etime(now,getappdata(handles.pwniControl,'oldtime')))
+% setappdata(handles.pwniControl,'oldtime',now);
+
 setappdata(handles.pwniControl,'rtBuffer',rtBuffer)
     
 
@@ -225,32 +252,61 @@ end
 avTime = round(str2double(get(handles.avTimeBox,'String')));
 rtBuffer=getappdata(handles.pwniControl,'rtBuffer');
 
-%Get the desired amount from teh buffer and average it
+%Get the desired amount from the buffer and average it
 newData = rtBuffer(end-avTime+1:end,:);
 newData = mean(newData,1);
 
 allRtPlots = oldAllRtPlots(2:end,:);
 allRtPlots(end+1,:) = newData;
 
-axis(handles.plotAxes1,'auto');
+yMin=str2double(get(handles.plotMinBox,'String'));
+yMax=str2double(get(handles.plotMaxBox,'String'));
+
+%axis(handles.plotAxes1,'auto');
 plot(allRtPlots(:,1),'Parent',handles.plotAxes1)
+axis(handles.plotAxes1,[-inf inf yMin yMax]);
 set(handles.plotAxes1,'XTickLabel','')
-axis(handles.plotAxes2,'auto');
+%axis(handles.plotAxes2,'auto');
 plot(allRtPlots(:,2),'Parent',handles.plotAxes2)
+axis(handles.plotAxes2,[-inf inf yMin yMax]);
 set(handles.plotAxes2,'XTickLabel','')
-axis(handles.plotAxes3,'auto');
+%axis(handles.plotAxes3,'auto');
 plot(allRtPlots(:,3),'Parent',handles.plotAxes3)
+axis(handles.plotAxes3,[-inf inf yMin yMax]);
 set(handles.plotAxes3,'XTickLabel','')
-axis(handles.plotAxes4,'auto');
+%axis(handles.plotAxes4,'auto');
 plot(allRtPlots(:,4),'Parent',handles.plotAxes4)
+axis(handles.plotAxes4,[-inf inf yMin yMax]);
 set(handles.plotAxes4,'XTickLabel','')
 
 sigs = std(allRtPlots,0,1);
-set(handles.sigmaText1,'String',['SD: ' num2str(sigs(1),3)])
-set(handles.sigmaText2,'String',['SD: ' num2str(sigs(2),3)])
-set(handles.sigmaText3,'String',['SD: ' num2str(sigs(3),3)])
-set(handles.sigmaText4,'String',['SD: ' num2str(sigs(4),3)])
-drawnow
+curFlux = allRtPlots(end,:);
+txt1 = ['SD: ' num2str(sigs(1),3) ', Current: ' num2str(curFlux(1),3)];
+txt2 = ['SD: ' num2str(sigs(2),3) ', Current: ' num2str(curFlux(2),3)];
+txt3 = ['SD: ' num2str(sigs(3),3) ', Current: ' num2str(curFlux(3),3)];
+txt4 = ['SD: ' num2str(sigs(4),3) ', Current: ' num2str(curFlux(4),3)];
+set(handles.sigmaText1,'String',txt1)
+set(handles.sigmaText2,'String',txt2)
+set(handles.sigmaText3,'String',txt3)
+set(handles.sigmaText4,'String',txt4)
+% set(handles.sigmaText1,'String',['SD: ' num2str(sigs(1),3)])
+% set(handles.sigmaText2,'String',['SD: ' num2str(sigs(2),3)])
+% set(handles.sigmaText3,'String',['SD: ' num2str(sigs(3),3)])
+% set(handles.sigmaText4,'String',['SD: ' num2str(sigs(4),3)])
+drawnow limitrate
+
+% Instead, now do this to the raw rtbuffer (in the listener callback)
+% if getappdata(handles.pwniControl,'doSharedMem')
+%     shmObj = getappdata(handles.pwniControl,'shmObj');
+%     % Not sure if this is necessary (to detach) but I'm worried about
+%     % memory leak
+%     if getappdata(handles.pwniControl,'shmObj') ~= 0
+%         delete(shmObj)
+%     end
+%     shmkey = getappdata(handles.pwniControl,'sharedMemKey');
+%     shmObj = shmobject(shmkey, curFlux);
+%     setappdata(handles.pwniControl,'shmObj',shmObj)
+% end
 
 setappdata(handles.pwniControl,'allRtPlots',allRtPlots)
 
@@ -357,7 +413,7 @@ if getappdata(handles.pwniControl,'acqState')
     setappdata(handles.pwniControl,'acqState',false)
     set(handles.startAcqBtn,'ForegroundColor',[0 0 0])
     set(handles.statusText,'String','Acquisition Stopped')
-%     daqS.stop
+    daqS.stop %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %     acqlh=getappdata(handles.pwniControl,'acqlh');
 %     delete(acqlh)
 
@@ -459,6 +515,52 @@ function maxSizeBox_Callback(hObject, eventdata, handles)
 % --- Executes during object creation, after setting all properties.
 function maxSizeBox_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to maxSizeBox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function plotMinBox_Callback(hObject, eventdata, handles)
+% hObject    handle to plotMinBox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of plotMinBox as text
+%        str2double(get(hObject,'String')) returns contents of plotMinBox as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function plotMinBox_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to plotMinBox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function plotMaxBox_Callback(hObject, eventdata, handles)
+% hObject    handle to plotMaxBox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of plotMaxBox as text
+%        str2double(get(hObject,'String')) returns contents of plotMaxBox as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function plotMaxBox_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to plotMaxBox (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
