@@ -22,7 +22,7 @@ function varargout = pwniControl(varargin)
 
 % Edit the above text to modify the response to help pwniControl
 
-% Last Modified by GUIDE v2.5 21-Nov-2015 15:51:46
+% Last Modified by GUIDE v2.5 01-Mar-2016 18:37:35
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -79,6 +79,8 @@ setappdata(handles.pwniControl,'ch0',ch0)
 setappdata(handles.pwniControl,'ch1',ch1)
 setappdata(handles.pwniControl,'ch2',ch2)
 setappdata(handles.pwniControl,'ch3',ch3)
+setappdata(handles.pwniControl,'sampleRate',sampleRate)
+
 rtPlotLength = str2num(get(handles.plotWidthBox,'String'));
 allRtPlots = zeros(rtPlotLength,4);
 setappdata(handles.pwniControl,'allRtPlots',allRtPlots)
@@ -569,3 +571,46 @@ function plotMaxBox_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in releaseDaqBtn.
+function releaseDaqBtn_Callback(hObject, eventdata, handles)
+% hObject    handle to releaseDaqBtn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+daqS=getappdata(handles.pwniControl,'daqS');
+rtlh = getappdata(handles.pwniControl,'rtlh');
+sampleRate=getappdata(handles.pwniControl,'sampleRate');
+
+% Pause the realtime display if necessary
+if getappdata(handles.pwniControl,'videoState')
+    stop(handles.vidTimer);
+    daqS.stop
+    delete(rtlh)
+end
+
+release(daqS)
+msgbox('DAQ Released. Press OK to take it back.','DAQ Released')
+uiwait
+daqS = daq.createSession('ni');
+ch0 = addAnalogInputChannel(daqS, 'Dev1', 0, 'Voltage');
+ch1 = addAnalogInputChannel(daqS, 'Dev1', 1, 'Voltage');
+ch2 = addAnalogInputChannel(daqS, 'Dev1', 2, 'Voltage');
+ch3 = addAnalogInputChannel(daqS, 'Dev1', 3, 'Voltage');
+daqS.Rate=sampleRate;
+setappdata(handles.pwniControl,'daqS',daqS)
+setappdata(handles.pwniControl,'ch0',ch0)
+setappdata(handles.pwniControl,'ch1',ch1)
+setappdata(handles.pwniControl,'ch2',ch2)
+setappdata(handles.pwniControl,'ch3',ch3)
+
+if getappdata(handles.pwniControl,'videoState')
+    start(handles.vidTimer);
+    rtlh = addlistener(daqS,'DataAvailable',@(src,event)RTgetData(src, event, handles));
+    setappdata(handles.pwniControl,'rtlh',rtlh)
+    daqS.IsContinuous = true;
+    daqS.startBackground;
+end
+
+
+
