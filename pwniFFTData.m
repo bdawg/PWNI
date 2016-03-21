@@ -28,6 +28,7 @@ ps2=ps2./max(ps2);
 plot(freq,ps)
 title(filename)
 
-axis([0 150 0 1e-4])
+
+%axis([0 150 0 1e-4])
 %axis([0 5e2 0 3e-6])
 %axis([0 150 0 20e-4])

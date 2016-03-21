@@ -22,7 +22,7 @@ function varargout = pwniControl(varargin)
 
 % Edit the above text to modify the response to help pwniControl
 
-% Last Modified by GUIDE v2.5 01-Mar-2016 18:37:35
+% Last Modified by GUIDE v2.5 17-Mar-2016 21:14:33
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -63,6 +63,7 @@ rtBufferSize = 256000; %Samples per channel in user RT buffer
 
 dataPath = '\data\';
 
+enableFlipmount = true;
 doSharedMem = true;
 sharedMemKey = 'nullerRTSHM';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -92,11 +93,23 @@ setappdata(handles.pwniControl,'doSharedMem',doSharedMem)
 setappdata(handles.pwniControl,'sharedMemKey',sharedMemKey)
 setappdata(handles.pwniControl,'shmObj',0)
 setappdata(handles.pwniControl,'oldtime',datenum(now));
+setappdata(handles.pwniControl,'enableFlipmount',enableFlipmount);
 
 logo = imread('littleRD.png');
 imshow(logo,'Parent',handles.logoAxes);
 set(handles.logoAxes,'XTickLabel','')
 set(handles.logoAxes,'YTickLabel','')
+
+if enableFlipmount
+    flipObj = serial('COM12', ...
+    'BaudRate',115200,'DataBits',8,'Parity','none','StopBits',1,'FlowControl','none');
+    fopen(flipObj); %Open the device
+    flipObj.Terminator=''; %Set terminator to ''
+else
+    flipObj=0;
+end
+setappdata(handles.pwniControl,'flipObj',flipObj)
+
 
 handles.vidTimer = timer(...
     'ExecutionMode', 'fixedRate', ...
@@ -157,6 +170,13 @@ delete(daqS)
 shmObj = getappdata(handles.pwniControl,'shmObj');
 if getappdata(handles.pwniControl,'shmObj') ~= 0
     delete(shmObj)
+end
+
+enableFlipmount=getappdata(handles.pwniControl,'enableFlipmount');
+if enableFlipmount
+    flipObj=getappdata(handles.pwniControl,'flipObj');
+    fclose(flipObj);
+    delete(flipObj);
 end
 
 delete(handles.pwniControl);
@@ -436,6 +456,10 @@ else % Start acqusition
     set(handles.statusText,'String','Acquisition Begun')
     setappdata(handles.pwniControl,'acqState',true)
     
+    darkFreq = str2double(get(handles.darkFreqBox,'String'));
+    shutterWaitTime = 5;
+    fileCount = 1;
+    
     % Start up the first file
     curFileSize = 0;
     filePref = get(handles.filenameBox,'String');
@@ -462,6 +486,21 @@ else % Start acqusition
             delete(acqlh)
             fclose(fid);
             filePref = get(handles.filenameBox,'String');
+            
+            if darkFreq > 0
+                if fileCount == darkFreq
+                    fileCount = -1; %This means it will open the shutter next time
+                    filePref = [filePref '_DARK'];                     
+                    flipInBtn_Callback(hObject, eventdata, handles)
+                    pause(shutterWaitTime)
+                end
+                if fileCount == 0
+                    flipOutBtn_Callback(hObject, eventdata, handles)
+                    pause(shutterWaitTime)
+                end 
+                fileCount = fileCount+1
+            end
+            
             filename = [dataPath filePref '_' datestr(clock,30) '.bin'];
             fid = fopen(filename,'w');
             acqlh = addlistener(daqS,'DataAvailable',@(src, event)logData(src, event, fid));
@@ -614,3 +653,200 @@ end
 
 
 
+function bg0Box_Callback(hObject, eventdata, handles)
+% hObject    handle to bg0Box (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of bg0Box as text
+%        str2double(get(hObject,'String')) returns contents of bg0Box as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function bg0Box_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to bg0Box (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function bg1Box_Callback(hObject, eventdata, handles)
+% hObject    handle to bg1Box (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of bg1Box as text
+%        str2double(get(hObject,'String')) returns contents of bg1Box as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function bg1Box_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to bg1Box (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function bg2Box_Callback(hObject, eventdata, handles)
+% hObject    handle to bg2Box (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of bg2Box as text
+%        str2double(get(hObject,'String')) returns contents of bg2Box as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function bg2Box_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to bg2Box (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function bg3Box_Callback(hObject, eventdata, handles)
+% hObject    handle to bg3Box (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of bg3Box as text
+%        str2double(get(hObject,'String')) returns contents of bg3Box as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function bg3Box_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to bg3Box (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in enableBgSubtCheckbox.
+function enableBgSubtCheckbox_Callback(hObject, eventdata, handles)
+% hObject    handle to enableBgSubtCheckbox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of enableBgSubtCheckbox
+
+
+% --- Executes on button press in measureBgCheckbox.
+function measureBgCheckbox_Callback(hObject, eventdata, handles)
+% hObject    handle to measureBgCheckbox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of measureBgCheckbox
+
+
+% --- Executes on button press in flipInBtn.
+function flipInBtn_Callback(hObject, eventdata, handles)
+% hObject    handle to flipInBtn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+flipObj=getappdata(handles.pwniControl,'flipObj');
+disp('Moving to position In')
+posn = '02';
+nbytes=6;
+hexString={'6A' '04' '00' posn '50' '01'};
+for ii = 1:nbytes
+    hex=hexString{ii};
+    dec=hex2dec(hex);
+    fwrite(flipObj,dec,'uint8')
+end
+
+pause(3)
+
+%Get status bits
+%Send request:
+nbytes=6;
+hexString={'29' '04' '00' '00' '50' '01'};
+for ii = 1:nbytes
+    hex=hexString{ii};
+    dec=hex2dec(hex);
+    fwrite(flipObj,dec,'uint8')
+end
+
+%Retrieve the get
+nbytes=12;
+response=fread(flipObj,nbytes);
+statusBits=response(9:12)
+
+% --- Executes on button press in flipOutBtn.
+function flipOutBtn_Callback(hObject, eventdata, handles)
+% hObject    handle to flipOutBtn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+flipObj=getappdata(handles.pwniControl,'flipObj');
+disp('Moving to position Out')
+posn = '01';
+nbytes=6;
+hexString={'6A' '04' '00' posn '50' '01'};
+for ii = 1:nbytes
+    hex=hexString{ii};
+    dec=hex2dec(hex);
+    fwrite(flipObj,dec,'uint8')
+end
+
+pause(3)
+
+%Get status bits
+%Send request:
+nbytes=6;
+hexString={'29' '04' '00' '00' '50' '01'};
+for ii = 1:nbytes
+    hex=hexString{ii};
+    dec=hex2dec(hex);
+    fwrite(flipObj,dec,'uint8')
+end
+
+%Retrieve the get
+nbytes=12;
+response=fread(flipObj,nbytes);
+statusBits=response(9:12)
+
+
+
+function darkFreqBox_Callback(hObject, eventdata, handles)
+% hObject    handle to darkFreqBox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of darkFreqBox as text
+%        str2double(get(hObject,'String')) returns contents of darkFreqBox as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function darkFreqBox_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to darkFreqBox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end

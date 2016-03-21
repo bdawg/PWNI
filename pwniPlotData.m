@@ -6,8 +6,8 @@ clear all
 datapath='\data\';
 
 %datapath='/Volumes/data/';
-filename='acqdata_Labtest20160210_04_20160210T133047'
-
+filename='acqdata_20160318T235539'
+%filename='acqdata17032016_1638_dark_20160318T134252'
 
 filestring=[datapath filename '.bin'];
 
@@ -62,5 +62,23 @@ disp(['Ch 0: ' num2str(ch0Av,'%e') ' +- ' num2str(ch0err,'%e')])
 disp(['Ch 1: ' num2str(ch1Av,'%e') ' +- ' num2str(ch1err,'%e')])
 disp(['Ch 2: ' num2str(ch2Av,'%e') ' +- ' num2str(ch2err,'%e')])
 disp(['Ch 3: ' num2str(ch3Av,'%e') ' +- ' num2str(ch3err,'%e')])
+
+ch0Max = max(ch0);
+ch1Max = max(ch1);
+ch2Max = max(ch2);
+ch3Max = max(ch3);
+ch0Min = min(ch0);
+ch1Min = min(ch1);
+ch2Min = min(ch2);
+ch3Min = min(ch3);
+
+disp(['Ch 0 min: ' num2str(ch0Min,'%e') ' , max:' num2str(ch0Max,'%e')])
+disp(['Ch 1 min: ' num2str(ch1Min,'%e') ' , max:' num2str(ch1Max,'%e')])
+disp(['Ch 2 min: ' num2str(ch2Min,'%e') ' , max:' num2str(ch2Max,'%e')])
+disp(['Ch 3 min: ' num2str(ch3Min,'%e') ' , max:' num2str(ch3Max,'%e')])
+
+
+
+
 
 
